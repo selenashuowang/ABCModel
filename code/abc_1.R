@@ -10,11 +10,7 @@
 #' 
 #' "bin": assuming the data is binary, can be network or item responses
 #' 
-#' @usage jnirt(X, Y, family_network, family_responses, K=0, rvar = FALSE ,
-#' cvar = FALSE,  dcor = FALSE, model = UU, 
-#' intercept=TRUE, seed = 1, nscan =
-#' 10000, burn = 500, odens = 25, plot=TRUE, print = TRUE, gof=TRUE,
-#' prior=list())
+#' @usage faster version of abc model
 #' @param X a list of V x V brain connectivity data. 
 #' @param Y a list of V x P attribute data.
 #' @param W a matrix of N x Q covariates for the connectivity data.
@@ -33,8 +29,8 @@
 #' \item{BETAPM}{posterior mean of the regression coefficient parameters for the connectivity data}
 #' \item{GAMMAPM}{posterior mean of the regression coefficient parameters for the attribute data}
 #' \item{THETAPM}{posterior samples of the latent person variable}
-#' \item{APM}{posterior mean of connectivity intercepts} 
-#' \item{BPM}{posterior mean of attribute intercepts} \item{U}{posterior estimates of multiplicative
+#' \item{APM}{posterior mean of connectivity intercepts} \item{BPM}{posterior
+#' mean of attribute intercepts} \item{U}{posterior estimates of multiplicative
 #' row effects u} \item{U_1}{the last iteration of the multiplicative
 #' row effects u} 
 #' \item{UVPM}{posterior mean of UV} 
@@ -50,13 +46,13 @@
 #' @author Selena Wang
 #' @examples
 #' 
-#' @export abc
+#' @export abc_1
 #' 
 
 
 
 
-abc<- function(X, Y,W, H, K=2,
+abc_1<- function(X, Y,W, H, K=2,
                indices = NULL, indices_irt = NULL,
                seed = 1, nscan = 10000, burn = 500, odens = 25,
                print = TRUE, gof=TRUE, plot=TRUE, 
@@ -136,6 +132,7 @@ abc<- function(X, Y,W, H, K=2,
   
   
   
+  
   # output items
   
   if(!is.null(W)){  BETA<- matrix(0,nrow = 0, ncol = ncol(W))}else{
@@ -182,10 +179,11 @@ abc<- function(X, Y,W, H, K=2,
   
   names_i<-NULL
   for(i in 1:ncol(indices_irt)){names_i<-c(names_i,paste("ThetaAlppha",indices_irt[1,i], indices_irt[2,i],sep = ","))}
-  TAC<-matrix(nrow=0,ncol=(V*P)) 
-  UVC<-matrix(nrow=0,ncol=(V*(V-1)/2)) 
+  TAC<-matrix(nrow=0,ncol=ncol(indices_irt)) 
+  UVC<-matrix(nrow=0,ncol=ncol(indices)) 
   
-
+  colnames(UVC) <- names_n
+  colnames(TAC) <- names_i
   
   
   VC<-matrix(nrow=0,ncol=2+length(c(seq(1,(K)*(K+1)/2), seq(1,(P)*(P+1)/2)))) 
@@ -226,11 +224,6 @@ abc<- function(X, Y,W, H, K=2,
     # update Fl
     if(!is.null(W)){EFl<-sapply(1:length(X), function(x) (as.numeric(a[x,]) + as.numeric(W[x,] %*% beta) + U %*% t(U)), simplify = FALSE)}
     if(is.null(W)){EFl<-sapply(1:length(X), function(x) (as.numeric(a[x,]) + U %*% t(U)), simplify = FALSE)}
-    
-    #Tl <-sapply(1:length(Y), function(x) (rTl_nrm(Tl[[x]], ETl[[x]],s1,Y[[x]])), simplify = FALSE)
-    #Fl <-sapply(1:length(X), function(x) (rFl_nrm(Fl[[x]], EFl[[x]],s2,X[[x]])), simplify = FALSE)
-    
-
     
  
     # EFl=list()
@@ -328,7 +321,7 @@ abc<- function(X, Y,W, H, K=2,
       
       tmp<-U %*% t(U)
       tmp.1<-NULL
-      tmp.1 <- c(tmp.1, tmp[upper.tri(tmp,diag = FALSE)])
+      for(i in 1:ncol(indices)){tmp.1 <- c(tmp.1 ,tmp[indices[1,i],indices[2,i]])}
       UVC<-rbind(UVC, c(tmp.1))
       THETAPS <- THETAPS + Theta 
       
