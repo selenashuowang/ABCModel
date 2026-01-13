@@ -43,7 +43,7 @@ Note that sufficient burn-in is need to reach optimal covariance parameter estim
 ## Usage
 
 
-The main functionality of the ABC Toolkit is encapsulated in the `abc.r` script, which performs MCMC estimation of each --------. Example data are in the `data` folder. The `abc.r` can do the following connectivity data analysis:
+The main functionality of the ABC Toolkit is encapsulated in the `abc.r` script, which performs MCMC estimation. Example data are in the `examplefiles` folder. The `abc.r` can do the following connectivity data analysis:
 
 ### Run ABC model
 
@@ -132,80 +132,57 @@ connectivity patterns and behavioral outcomes. We set up:
 First, we set up basic parameters:
 
 ``` r
-N<-1000 #N is sample size
-ids=seq(1,N)
+#### args 1) generate data N 50 versus 200
+N<-10
 
-V<-20 # V is number of brain regions
-P<-1 # P is number of attributes
-
-K<-1 # K and D are latent space
-D<-1
-
-W<-NULL# W and H are covariates
+## args 2) two levels of V, 20 versus 70
+V<-20
+#P<-2
+P<-1
+K<-2
+W<-NULL
 H<-NULL
 ```
 
 Next, we create the covariance structure with significant brain regions:
 
 ``` r
-a_t<-matrix(0, nrow = N, ncol = 1)
-S <- diag(1,V+D)
-n_signa=V
+## args 4) Covariance of U and theta
 
-id_siga=c(1,2,3,4,5,6,7,8) # sepcify significant brain regions
+A <- diag(1,K+P)
+A[1,3]=0.9
+A[3,1]=0.9
 
-id=list()
-id[[1]]=id
 
-# Set correlation structure for significant regions
-for (each in id_siga){
-  
-  S[each,id_siga[!id_siga %in% each]]=.9
-}
 
-S[(V+1),id_siga]=.9
-S[id_siga,(V+1)]=.9
+seed <- 100
 
-# Extract submatrices
-Su = matrix(S[1:V,1:V], nrow=V, ncol=V)
-Stheta = matrix(S[(V+1):(V+D),(V+1):(V+D) ], nrow=D, ncol=D)
-Sutheta =matrix(S[(V+1):(V+D),1:V], nrow = D, ncol = V)
+set.seed(seed)
 
-# Print Sutheta to show that brain regions 1-8 are significantly associated with behavior (correlation = 0.9)
-print(Sutheta)
-```
+UTheta <- mvrnorm(n = V, mu=rep(0,K+P), Sigma=A)
+U_t <- UTheta[,1:K]
+Theta_t <- UTheta[,(K+1):(K+P)]
 
-    ##      [,1] [,2] [,3] [,4] [,5] [,6] [,7] [,8] [,9] [,10] [,11] [,12] [,13] [,14] [,15] [,16]
-    ## [1,]  0.9  0.9  0.9  0.9  0.9  0.9  0.9  0.9    0     0     0     0     0     0     0     0
-    ##      [,17] [,18] [,19] [,20]
-    ## [1,]     0     0     0     0
 
-Generate latent variables using multivariate normal distribution:
+#U_t<-mvrnorm(n = V, mu=rep(0,K), Sigma=diag(1,K))
+#Theta_t<-mvrnorm(n = V, mu=rep(0,P), Sigma=diag(2,P))
 
-``` r
-UTheta <- mvrnorm(n = N, mu=rep(0,(V+D)), Sigma=S, empirical = FALSE)
-U.array=array(NA, dim = c(V,K,N))
-U.array[,1,]=t(UTheta[,1:(V)])
-Theta_t <- data.matrix(UTheta[,(V+1):(V+D)])
-rownames(Theta_t)=ids
-```
+# beta_t<-matrix(1,nrow = ncol(W),ncol=1)
+# gamma_t<-matrix(2,nrow = ncol(H),ncol=1)
 
-Set model parameters and generate connectivity matrices:
-
-``` r
 beta_t=NULL
 gamma_t=NULL
 
-#connectivity variance
-s2_t=0.1
+#connectivity variance, five levels 0.5,1,5
+s2_t=as.numeric(0.5)
 #attribute variance
-s1_t=0.1
+s1_t=0.5
 
-Alpha_t=matrix(1, nrow = P, ncol = 1)
-theoretical.str=Alpha_t
-b_t=matrix(0, nrow = P, ncol = 1)
-
+```
+Finally, generate connectivity and attribute information
+``` r
 X<-list()
+Y<-list()
 for(i in 1:N){
   
   errormatrix=matrix(0, nrow = V, ncol = V)
@@ -213,34 +190,13 @@ for(i in 1:N){
   errormatrix=t(errormatrix)+errormatrix
   diag(errormatrix)=rnorm(V, sd=sqrt(s2_t))
   
-  X[[i]]<-as.numeric(a_t[i,])  + U.array[,,i]%*% t(U.array[,,i]) +errormatrix
-  #diag(X[[i]])=NA
+  X[[i]]<-as.numeric(a_t[i,])  + U_t%*% t(U_t) +errormatrix
+  diag(X[[i]])=0
+  Y[[i]]<-as.numeric(b_t[i,])  + Theta_t +matrix(rnorm(V*P, sd=sqrt(s1_t)),V,P)
   
 }
 ```
 
-Finally, generate attribute information, with significant brain regions influencing values:
-
-``` r
-# Generate region-level attribute information
-Y <- vector("list", N)
-
-for (i in 1:N) {
-  
-  # Mean structure replicated across V brain regions
-  mean_i <- matrix(rep(b_t, each = V), nrow = V, ncol = P) +
-            matrix(rep(Theta_t[i, ] %*% t(Alpha_t), each = V),
-                   nrow = V, ncol = P)
-  
-  # Add region-specific noise
-  Y[[i]] <- mean_i + matrix(
-    rnorm(V * P, sd = sqrt(s1_t)),
-    nrow = V,
-    ncol = P
-  )
-}
-
-```
 ## Fit ABC Model and Store Results
 
 Here we show the model fitting process for completeness. However, since
