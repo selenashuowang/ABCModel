@@ -2,7 +2,7 @@
 ## Overview
 
 
-The Attributes-informed Brain Connectivity Model (ABC) model is specifically designed 
+The Attributes-informed Brain Connectivity Model (ABC) model is specifically designed to model functional or structural connectivity matricies in combination with region level attribute information inorder to obtain a group level esitmate of connectivity informed by given attributes.
 
 
 
@@ -12,7 +12,7 @@ This toolkit is implemented in R. Follow these steps for setup:
 
 
 1. Clone or download the repository to your local machine.
-2. Open R and navigate to the directory containing the toolkit.
+2. Open R and navigate to the directory containing the toolkit and necessary helper functions.
 3. Run the ABC model.
 
 
@@ -25,7 +25,7 @@ The toolkit is designed to analyze data consisting of brain connectivity and reg
 * `X`: a list of $V \times V$ brain connectivity data.
 * `Y`: a list of $V \times P$ attribute data.
 
-Additionally, simulated example data is available in the directory `data/X.RData` and `data/Y.RData` for demonstration purposes.
+Additionally, simulated example data is available in the directory `data/X.rdata` and `data/Y.rdata` for demonstration purposes.
 
 
 ## Key parameters
@@ -38,8 +38,6 @@ Additionally, simulated example data is available in the directory `data/X.RData
 
 Note that sufficient burn-in is need to reach optimal covariance parameter estimates. See details in the method paper. 
 
-(Add Note on latent dimension)
-
 ## Usage
 
 
@@ -50,10 +48,10 @@ The main functionality of the ABC Toolkit is encapsulated in the `abc.r` script,
 ``` {r}
 library(abc.r)
 
-setwd("./data") #directory of example data 
+setwd("./examplefiles") #directory of example data 
 
-load(file='X.rda')
-load(file='Y.rda')
+load(file='X.rdata')
+load(file='Y.rdata')
 
 
 model1=abc(X, Y,W=NULL, H=NULL, K = 2,
@@ -86,15 +84,12 @@ library(psych)
 library(coda)
 library(magic)
 ```
-
-    ## Loading required package: abind
-
 ## Source ABC code
 
 We first define a helper function to source all R files from the abc package directory. This function will load all the necessary functions for our analysis.
 
 ``` r
-#set seed and load the latentSNA code
+#set seed and load the abc code
 set.seed(18)
 
 sourceEntireFolder <- function(folderName, verbose=FALSE, showWarnings=TRUE) {
@@ -248,7 +243,7 @@ result$model$UVC |> dim()
 result$model$UVPM |> dim()
 ```
 20 20 
-1.  UVC matrix (600 x 190 ): Provides all connectivity esitmates for connectivity edge  
+1.  UVC matrix (500 x 190 ): Provides all connectivity esitmates (`nscan/odens`) for connectivity edge  
 2.  UVPM (20 x 20): Contains the scaled estimated connectivity for each edge.
 3.  EFlPM (800 x 1): Provides estimated connectivity values for each participant in our training set 
 
