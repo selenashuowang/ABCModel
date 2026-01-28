@@ -118,11 +118,10 @@ sourceEntireFolder("code", verbose=FALSE, showWarnings=TRUE)
 In this section, we generate simulated data that mimics brain
 connectivity patterns and behavioral outcomes. We set up:
 
-- A sample of 1000 subjects
+- A sample of 10 subjects
 - 20 brain regions
 - 8 significant brain regions with strong correlations (0.9)
 - A single region attribute 
-- One-dimensional latent space
 
 First, we set up basic parameters:
 
@@ -272,7 +271,7 @@ correlations
 [1]  0.4929648
 
 This value indicates quality model fit.
-## Plotting Estimated connectivity matrix
+## Plotting estimated connectivity matrix
 
 ```r
 library(corrplot)
@@ -285,7 +284,7 @@ corrplot(result$model$UVPM,
 ```
 ![](examplefiles/CorrplotSimulation.png)
 
-## Detmining Credible Intervals
+## Determining Credible Intervals
 
 The `UVC` value presents each connectivity estimate for each edge ($V * (V-1)/2$). These estimates can be used to compute a 95% credible interval for each edge. This credible interval can be compared with models ran using different populations to compared populations. 
 
