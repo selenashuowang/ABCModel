@@ -12,10 +12,10 @@ library(Matrix)
 library(CovTools)
 library(ggplot2)
 library(plyr)
-library(lvm4net)
-library(pROC)
+#library(lvm4net)
+#library(pROC)
 
-library(sbm)
+#library(sbm)
 
 sourceEntireFolder <- function(folderName, verbose=FALSE, showWarnings=TRUE) {
   files <- list.files(folderName, full.names=TRUE)
@@ -36,7 +36,7 @@ sourceEntireFolder <- function(folderName, verbose=FALSE, showWarnings=TRUE) {
 }
 
 ## change it to code folder
-sourceEntireFolder("/gpfs/gibbs/project/zhao_yize/sw2384/code", verbose=FALSE, showWarnings=TRUE)
+sourceEntireFolder("code_behavior_updated", verbose=FALSE, showWarnings=TRUE)
 
 #### args 1) generate data N 50 versus 200
 N<-10
@@ -105,41 +105,30 @@ for(i in 1:N){
   diag(errormatrix)=rnorm(V, sd=sqrt(s2_t))
   
   X[[i]]<-as.numeric(a_t[i,])  + U_t%*% t(U_t) +errormatrix
-  diag(X[[i]])=NA
+  diag(X[[i]])=0
   Y[[i]]<-as.numeric(b_t[i,])  + Theta_t +matrix(rnorm(V*P, sd=sqrt(s1_t)),V,P)
   
 }
 
 
-true_Uv=U_t%*% t(U_t)
-obs_x=true_Uv[upper.tri(true_Uv, diag = FALSE)]
+train_ratio <- 0.8
+n <- length(X)
+train_indices <- sample(seq_len(n), size = floor(train_ratio * n))
+test_indices <- setdiff(seq_len(n), train_indices)
 
-
-names(X)=as.character(seq(1,length(X)))
-names(Y)=as.character(seq(1,length(X)))
-ids=names(X)
-
-
-sampled.id=sample(ids, round(length(ids)*.5), replace = FALSE)
-
-train.id=ids[!ids %in% sampled.id]
-
-X.array=simplify2array(X)
-
-X.array[,,sampled.id]=NA
-
-X_pred=lapply(seq(dim(X.array)[3]), function(x) X.array[ , , x])
-
+X_train <- X[train_indices]
+X_test <- X[test_indices]
+Y_train <- Y[train_indices]
+Y_test <- Y[test_indices]
 
 ## fit model
 df=abc(X=X_pred, Y=Y,W=NULL, H=NULL, K=2,
-            indices = NULL, indices_irt = NULL,
-            seed = 1, nscan = 5000, burn = 100, odens = 10,
-            print = FALSE, gof=FALSE, plot=FALSE,
-            prior=list())
-
-
-
+       indices = NULL, indices_irt = NULL,
+       seed = 1, nscan = 5000, burn = 100, odens = 10,
+       print = FALSE, gof=FALSE, plot=FALSE,
+       prior=list())
+result=list("model"=df,'testX' = X_test,'testY' = Y_test)
+saveRDS(res,'simulationABC.rds')
 
 
 
