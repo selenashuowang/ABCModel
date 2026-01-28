@@ -49,6 +49,7 @@
 
 
 
+
 bc<- function(X, W,  K=2,
                indices = NULL,
                seed = 1, nscan = 10000, burn = 500, odens = 25,
@@ -56,47 +57,30 @@ bc<- function(X, W,  K=2,
                prior=list())
 { 
   ## record model set up 
-  
   input<-list(K=K, nscan=nscan, burn=burn, odens=odens, prior=prior, indices = indices)
   # set random seed
   set.seed(seed)
-  
-  
-  
-  
   
   # starting Fl values
   Fl<-X
 
   N<-length(X)
   V<-nrow(X[[1]])
-
-  
   
   if(is.null(prior$Sutheta0)){ prior$Sutheta0<-diag(K) } 
   if(is.null(prior$etautheta)){ prior$etautheta<-(K+2) } 
   
   # starting intercept values
   a<-matrix(sapply(Fl, mean, na.rm=TRUE ))
-
   
   # starting beta values
   if(!is.null(W)){ beta<-matrix(rep(0,ncol(W)), nrow = ncol(W),ncol=1) }else{beta<-NULL} 
-
-  
-  
   
   s2<-mean(sapply(1:length(X), function(x) mean((Fl[[x]] - a[x,])^2, na.rm=TRUE)), na.rm=TRUE)
   
-  
-  
-  
   # U
   tmp<-sapply(1:length(X), function(x) Fl[[x]] - a[x,], simplify = FALSE)
-  
   for(i in 1:length(X)){tmp[[i]][is.na(tmp[[i]])]=0}
-  
-
   E<-Reduce('+', tmp)/N
   
   U<-matrix(0,V,K) 
@@ -104,61 +88,28 @@ bc<- function(X, W,  K=2,
   {  
     sE<-svd(E)
     U<-sE$u[,1:K,drop=FALSE]%*%diag(sqrt(sE$d[1:K]),nrow=K)
-    
   }
   
- 
-  
-  
-  
-  # output items
-  
-  if(!is.null(W)){  BETA<- matrix(0,nrow = 0, ncol = ncol(W))}else{
+  # Initialize output matrices
+  if(!is.null(W)){  
+    BETA<- matrix(0,nrow = 0, ncol = ncol(W))
+  }else{
     BETA<- matrix(0,nrow = 0, ncol = 0)
   }
   
   BETAPS <- beta * 0 
-
   XPM<-EFlPM<-list()
   UVPS <- U %*% t(U) * 0 
   APS<- rep(0,length(X))  
   names(APS)<- names(X)
   rownames(U)<-rownames(X[[1]])
-  # XPS<-list()
-  # 
-  # GOF<-list()
-  # for(i in 1:length(X)){
-  #   gofXY<-c(gofstats_c(X[[i]]))
-  #   GOF[[i]]<-matrix(gofXY,1,length(gofXY))  
-  #   rownames(GOF[[i]])<-"obs"
-  #   colnames(GOF[[i]])<-names(gofXY)
-  #   
-  #   XPS[[i]]<-matrix(0,nrow=V,ncol=V) ; dimnames(XPS[[i]])<-dimnames(X[[i]]) 
-  #   
-  # }
   
-  
-  
-  if(is.null(indices)){
-    indices<-matrix(sample(1:nrow(X[[1]]),min(round(nrow(X[[1]])/5),5)*2, replace = FALSE), nrow=2)
-    
-  }
-  names_n<-NULL
-  for(i in 1:ncol(indices)){names_n<-c(names_n,paste("UV",indices[1,i], indices[2,i],sep = ","))}
-  
-  UVC<-matrix(nrow=0,ncol=ncol(indices)) 
-  
-  colnames(UVC) <- names_n
-
+  # Initialize UVC exactly like ABC model
+  UVC<-matrix(nrow=0,ncol=(V*(V-1)/2)) 
   
   VC<-matrix(nrow=0,ncol=1+length(c(seq(1,(K)*(K+1)/2)))) 
-  
-
   colnames(VC) <- c(paste("Su",seq(1,(K)*(K+1)/2),sep=""),
                    "ve_connectivity") 
-
-  
-  
   
   # MCMC 
   have_coda<-suppressWarnings(
@@ -166,175 +117,74 @@ bc<- function(X, W,  K=2,
   
   for (s in 1:(nscan + burn)) 
   { 
+    if(!is.null(W)){
+      EFl<-sapply(1:length(X), function(x) (as.numeric(a[x,]) + as.numeric(W[x,] %*% beta) + U %*% t(U)), simplify = FALSE)
+    } else {
+      EFl<-sapply(1:length(X), function(x) (as.numeric(a[x,]) + U %*% t(U)), simplify = FALSE)
+    }
     
-    
-    if(!is.null(W)){EFl<-sapply(1:length(X), function(x) (as.numeric(a[x,]) + as.numeric(W[x,] %*% beta) + U %*% t(U)), simplify = FALSE)}
-    if(is.null(W)){EFl<-sapply(1:length(X), function(x) (as.numeric(a[x,]) + U %*% t(U)), simplify = FALSE)}
-    
-    # update Fl
-    # EFl=list()
-    # for(i in 1:length(X)){
-    #   if(!is.null(W)){EFl[[i]] <- as.numeric(a[i,]) + as.numeric(W[i,] %*% beta) + U %*% t(U)}else{
-    #     EFl[[i]] <- as.numeric(a[i,]) + U %*% t(U)
-    #   }
-    #   #Fl[[i]] <- rFl_nrm(Fl[[i]], EFl[[i]],s2,X[[i]])
-    #   
-    # }
-    # 
-    
-    # update s2/s1
+    # update s2
     s2<-rs2(Fl,offset = EFl, nu2=prior$nu2,s20=prior$s20)  
-
     
     # update beta, a 
     tmp <- rbeta_a_fc_per(Fl,W=W,s2=s2,offset=U%*%t(U),ivA=prior$ivA,beta0=prior$beta0,S0=prior$S0) 
     beta <- tmp$beta 
     a <- tmp$a
     
-   
-    
-    
     ## update variances
     tmp <- rSu(U, Su0=prior$Sutheta0,etau=prior$etautheta) 
     Su=tmp$Su
-    
-    
-    
-    
-    
     
     # update U,V
     if (K > 0)
     {
       U<-rU_con(Fl,U, Su, s2, offset=sapply(EFl, function(x) x-U%*%t(U), simplify = FALSE))
-      U <- U -   colMeans(U)
+      U <- U - colMeans(U)
       
-      if(s ==1){U_target<-U}
-
-      if(s>1){
+      if(s == 1){U_target<-U}
+      if(s > 1){
         tmp <- Procrustes(U, U_target,
                           translate = FALSE,
                           dilate = FALSE,
                           sumsq = FALSE)
         U<-tmp$X.new
-
-
-
-
       }
-      
     }
-    
-    
-    
-  
-    
     
     # save parameter values and monitor the MC
     if(s%%odens==0 & s>burn) 
     {  
       # save results
-      
       BETA<-rbind(BETA, as.vector(beta)) 
-      VC<-rbind(VC, c( Su[upper.tri(Su, diag = T)], s2)) 
-
+      VC<-rbind(VC, c(Su[upper.tri(Su, diag = T)], s2)) 
       BETAPS<-BETAPS+beta
-
-      
       
       # update posterior sums of random effects
       UVPS <- UVPS + U %*% t(U)
       
+      # Store UVC exactly like ABC model
       tmp<-U %*% t(U)
       tmp.1<-NULL
-      for(i in 1:ncol(indices)){tmp.1 <- c(tmp.1 ,tmp[indices[1,i],indices[2,i]])}
+      tmp.1 <- c(tmp.1, tmp[upper.tri(tmp,diag = FALSE)])
       UVC<-rbind(UVC, c(tmp.1))
       
       APS <- APS + a
-
-      # Xs<-list()
-      # for (i in 1:length(X)){
-      #   Xs[[i]]<-simX_nrm(EFl[[i]],s2)
-      #   # update posterior sum
-      #   XPS[[i]]<-XPS[[i]]+Xs[[i]]
-      # 
-      #   # save posterior predictive GOF stats
-      #   if(gof){ GOF[[i]]<-rbind(GOF[[i]],c(gofstats_c(Xs[[i]]))) }
-      #   
-      # }
-      
-      
-      #print MC progress
-      
-      # if(plot)
-      # {
-      #   # plot VC
-      #   if(!gof | length(beta)==0 )
-      #   { 
-      #     par(mfrow=c(1+2*gof,2),mar=c(3,3,1,1),mgp=c(1.75,0.75,0)) 
-      #   }
-      #   if(gof & length(beta)>0 )
-      #   { 
-      #     par(mar=c(3,3,1,1),mgp=c(1.75,0.75,0)) 
-      #     layout(matrix(c(1,3,5,1,3,5,2,4,6,2,4,7),3,4)  ) 
-      #   } 
-      #   
-      #   mVC <- apply(VC, 2, median)
-      #   matplot(VC, type = "l", lty = 1)
-      #   abline(h = mVC, col = 1:length(mVC))
-      #   
-      #   # plot BETA
-      #   if(length(beta)>0)
-      #   {
-      #     mBETA <- apply(BETA, 2, median)
-      #     matplot(BETA, type = "l", lty = 1, col = 1:length(mBETA))
-      #     abline(h = mBETA, col = 1:length(mBETA))
-      #     abline(h = 0, col = "gray")
-      #   }
-      #   
-      #   # plot GOF 
-      #   if(gof)
-      #   {
-      #     for(k in 1:ncol(GOF[[1]]))
-      #     {
-      #       hist(GOF[[1]][-1,k],xlim=range(GOF[[1]][,k]),main="",prob=TRUE,
-      #            xlab=colnames(GOF[[1]])[k],col="lightblue",ylab="",yaxt="n")
-      #       abline(v=GOF[[1]][1,k],col="red")
-      #     }
-      #   } 
-      #   
-      # }
     }
-    
-    
   } # end MCMC   
   
-  # output 
-  
-  
   # posterior means 
-  BETAPM<-BETAPS/nrow(VC)
-  APM<-APS/nrow(VC)
-  UVPM<-UVPS/nrow(VC)
-
-  # for(i in 1:length(X)){
-  #   XPM[[i]]<-XPS[[i]]/nrow(VC) 
-  # 
-  #   if(!is.null(W)){ EFlPM[[i]]<-APM[i,] + as.numeric(W[i,] %*% BETAPM) + UVPM }else(
-  #     EFlPM[[i]]<-APM[i,] + UVPM
-  #   )
-  # 
-  #   
-  # }
-  # 
+  BETAPM <- BETAPS/nrow(VC)
+  APM <- APS/nrow(VC)
+  UVPM <- UVPS/nrow(VC)
   
-  
-  if(!is.null(W)){EFlPM<-sapply(1:length(X), function(x) (APM[x,] + as.numeric(W[x,] %*% BETAPM) + UVPM), simplify = FALSE)}
-  if(is.null(W)){EFlPM<-sapply(1:length(X), function(x) (APM[x,] + UVPM), simplify = FALSE)}
+  if(!is.null(W)){
+    EFlPM<-sapply(1:length(X), function(x) (APM[x,] + as.numeric(W[x,] %*% BETAPM) + UVPM), simplify = FALSE)
+  } else {
+    EFlPM<-sapply(1:length(X), function(x) (APM[x,] + UVPM), simplify = FALSE)
+  }
   
   names(APM)<-names(X)
   rownames(UVPM)<-colnames(UVPM)<-rownames(X[[1]])
-  
   
   # asymmetric output 
   UDV<-eigen(UVPM)
@@ -342,12 +192,9 @@ bc<- function(X, W,  K=2,
   
   rownames(U)<-rownames(X[[1]]) 
   
-  fit <- list(BETAPM=BETAPM,VC=VC, APM=APM,U=U_1,UVPM=UVPM, EFlPM=EFlPM,
-              X=X, UVC=UVC, input=input, indices=indices)
+  fit <- list(BETAPM=BETAPM, VC=VC, APM=APM, U=U_1, UVPM=UVPM, EFlPM=EFlPM,
+              X=X, UVC=UVC, input=input)
   
   class(fit) <- "bc"
   fit
 }
-
-
-
